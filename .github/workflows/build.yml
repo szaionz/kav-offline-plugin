@@ -25,6 +25,7 @@ jobs:
 
       - name: Run script in Termux Docker container
         run: |
+          mkdir out && chown 1000:1000 out && \
           docker run --rm \
             --platform linux/${{ matrix.arch == 'aarch64' && 'arm64' || 'amd64' }} \
             -v ${{ github.workspace }}:/workspace \
