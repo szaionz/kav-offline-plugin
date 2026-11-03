@@ -1,0 +1,60 @@
+name: Kav offline build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [aarch64, amd64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for multi-arch execution
+        uses: docker/setup-qemu-action@v3
+
+      - name: Create output directory
+        run: mkdir -p ./out
+
+      - name: Run script in Termux Docker container
+        run: |
+          docker run --rm \
+            --platform linux/${{ matrix.arch == 'aarch64' && 'arm64' || 'amd64' }} \
+            -v ${{ github.workspace }}:/workspace \
+            -v ${{ github.workspace }}/out:/out \
+            -e ARCH=${{ matrix.arch }} \
+            -e OTP_VERSION=2.10.0 \
+            -e OPENJDK_VERSION=25 \
+            termux/termux-docker:${{ matrix.arch }} \
+            bash /workspace/build.sh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kav-offline-${{ matrix.arch }}
+          path: ./out/*.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./all-artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./all-artifacts/*.tar.gz
+          generate_release_notes: true
